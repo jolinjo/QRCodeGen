@@ -560,27 +560,47 @@ def _add_logo_to_dxf(
         if tag == "path":
             d = elem.get("d", "")
             if d:
-                # 提取所有 M, L 命令的座標
-                import re
-                # 匹配 M, L, m, l 命令後面的座標
-                matches = re.findall(r'[MLml]\s+([0-9.-]+)\s+([0-9.-]+)', d)
-                for x_str, y_str in matches:
-                    x = float(x_str) * sx + tx
-                    y = float(y_str) * sy + ty
-                    min_x = min(min_x, x)
-                    min_y = min(min_y, y)
-                    max_x = max(max_x, x)
-                    max_y = max(max_y, y)
-                # 如果沒有找到座標，至少提取第一個 M 命令
-                if not matches:
-                    first_m = re.search(r'M\s+([0-9.-]+)\s+([0-9.-]+)', d)
-                    if first_m:
-                        x = float(first_m.group(1)) * sx + tx
-                        y = float(first_m.group(2)) * sy + ty
-                        min_x = min(min_x, x)
-                        min_y = min(min_y, y)
-                        max_x = max(max_x, x)
-                        max_y = max(max_y, y)
+                # 使用 svg.path 庫來正確解析 path 數據（如果可用）
+                try:
+                    from svg.path import parse_path
+                    path_obj = parse_path(d)
+                    
+                    # 從 path 對象提取所有點
+                    # 使用 point() 方法在路徑上採樣點
+                    path_length = path_obj.length()
+                    num_samples = max(50, min(500, int(path_length / 2)))
+                    if num_samples > 0:
+                        for i in range(num_samples + 1):
+                            t = i / num_samples if num_samples > 0 else 0
+                            try:
+                                pos = path_obj.point(t)
+                                x = pos.real * sx + tx
+                                y = pos.imag * sy + ty
+                                min_x = min(min_x, x)
+                                min_y = min(min_y, y)
+                                max_x = max(max_x, x)
+                                max_y = max(max_y, y)
+                            except Exception:
+                                pass
+                except (ImportError, Exception):
+                    # 如果 svg.path 不可用，使用正則表達式提取所有座標
+                    import re
+                    # 提取所有數字對（可能是座標）
+                    # 匹配所有可能的座標格式：M x,y L x y m x y l x,y 等
+                    coords = []
+                    
+                    # 提取所有數字對
+                    number_pairs = re.findall(r'([0-9.-]+)\s*[, ]\s*([0-9.-]+)', d)
+                    for x_str, y_str in number_pairs:
+                        try:
+                            x = float(x_str) * sx + tx
+                            y = float(y_str) * sy + ty
+                            min_x = min(min_x, x)
+                            min_y = min(min_y, y)
+                            max_x = max(max_x, x)
+                            max_y = max(max_y, y)
+                        except (ValueError, TypeError):
+                            pass
         elif tag == "circle":
             cx = float(elem.get("cx", 0)) * sx + tx
             cy = float(elem.get("cy", 0)) * sy + ty
@@ -620,6 +640,12 @@ def _add_logo_to_dxf(
     # 遍歷所有元素找到邊界
     # 初始化變換矩陣
     initial_transform = (1, 0, 0, 1, 0, 0)
+    
+    # 調試：輸出根元素的所有子元素標籤
+    import sys
+    child_tags = [child.tag.split("}")[-1] if "}" in child.tag else child.tag for child in root]
+    print(f"  Root element children tags: {child_tags}", file=sys.stderr)
+    
     for child in root:
         find_bounds(child, initial_transform)
     
@@ -627,15 +653,14 @@ def _add_logo_to_dxf(
     if min_x != float('inf') and min_y != float('inf'):
         logo_content_center_x = (min_x + max_x) / 2
         logo_content_center_y = (min_y + max_y) / 2
-        import sys
         print(f"  Found actual content bounds: ({min_x}, {min_y}) to ({max_x}, {max_y})", file=sys.stderr)
         print(f"  Actual content center: ({logo_content_center_x}, {logo_content_center_y})", file=sys.stderr)
     else:
         # 如果沒有找到邊界，使用 viewBox 中心
         logo_content_center_x = viewbox_x + svg_width / 2
         logo_content_center_y = viewbox_y + svg_height / 2
-        import sys
         print(f"  Using viewBox center: ({logo_content_center_x}, {logo_content_center_y})", file=sys.stderr)
+        print(f"  Warning: Could not find actual content bounds. min_x={min_x}, min_y={min_y}", file=sys.stderr)
     
     # 將 logo 內容中心映射到清除區域中心
     x_offset = clear_center_x - logo_content_center_x * uniform_scale
