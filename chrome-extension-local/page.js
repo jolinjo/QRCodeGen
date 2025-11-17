@@ -64,6 +64,42 @@ async function loadCycleLogo(cycle) {
 }
 const API_URL = 'http://127.0.0.1:5002/generate';
 
+// 容錯率對應的最大 logo 比例
+const ERROR_LEVEL_MAX_LOGO_SCALE = {
+  L: 0.07,  // 7%
+  M: 0.15,  // 15%
+  Q: 0.25,  // 25%
+  H: 0.30,  // 30%
+};
+
+// 獲取當前容錯率對應的最大 logo 比例
+function getMaxLogoScale() {
+  const errorLevel = (els.errorLevel.value || 'L').toUpperCase();
+  return ERROR_LEVEL_MAX_LOGO_SCALE[errorLevel] || 0.07;
+}
+
+// 更新 logo 比例輸入框的最大值和當前值
+function updateLogoScaleLimit() {
+  const maxScale = getMaxLogoScale();
+  els.logoScale.max = maxScale.toFixed(2);
+  
+  // 如果當前值超過新的最大值，自動調整
+  const currentValue = parseFloat(els.logoScale.value);
+  if (!Number.isNaN(currentValue) && currentValue > maxScale) {
+    els.logoScale.value = maxScale.toFixed(2);
+    setMessage(
+      `⚠️ 容錯率 ${els.errorLevel.value} 的最大 Logo 比例為 ${(maxScale * 100).toFixed(0)}%，已自動調整為 ${(maxScale * 100).toFixed(0)}%`,
+      'error'
+    );
+    // 3 秒後清除訊息
+    setTimeout(() => {
+      if (els.message.textContent.includes('已自動調整')) {
+        setMessage('', '');
+      }
+    }, 3000);
+  }
+}
+
 const els = {
   status: document.getElementById('server-status'),
   data: document.getElementById('qr-data'),
@@ -168,16 +204,28 @@ async function generate() {
   const extracted = metadata.filename;
   const cycleNumber = metadata.cycle;
 
+  // 檢查 logo 比例是否超過容錯率限制
+  const maxLogoScale = getMaxLogoScale();
   const logoRatio = parseFloat(els.logoScale.value);
+  
   if (!Number.isNaN(logoRatio)) {
-    const clamped = Math.min(Math.max(logoRatio, 0), 0.4);
+    if (logoRatio > maxLogoScale) {
+      setMessage(
+        `Logo 比例 (${(logoRatio * 100).toFixed(0)}%) 超過容錯率 ${els.errorLevel.value} 的最大值 (${(maxLogoScale * 100).toFixed(0)}%)，請調整 Logo 比例或提高容錯率`,
+        'error'
+      );
+      return;
+    }
+    const clamped = Math.min(Math.max(logoRatio, 0), maxLogoScale);
     basePayload.logoScale = clamped;
     if (clamped !== logoRatio) {
       els.logoScale.value = clamped.toFixed(2);
     }
   } else {
-    basePayload.logoScale = 0.3;
-    els.logoScale.value = '0.30';
+    // 如果輸入無效，使用預設值（但不超過最大值）
+    const defaultScale = Math.min(0.3, maxLogoScale);
+    basePayload.logoScale = defaultScale;
+    els.logoScale.value = defaultScale.toFixed(2);
   }
 
   const widthMm = parseFloat(els.qrWidth.value);
@@ -322,6 +370,14 @@ async function generate() {
 els.button.addEventListener('click', () => {
   generate();
 });
+
+// 監聽容錯率變化，動態調整 logo 比例的最大值
+els.errorLevel.addEventListener('change', () => {
+  updateLogoScaleLimit();
+});
+
+// 頁面載入時初始化 logo 比例的最大值
+updateLogoScaleLimit();
 
 checkServer();
 setInterval(checkServer, 5000);
