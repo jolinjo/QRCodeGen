@@ -54,3 +54,6 @@ htmlcov/
 # Chrome Extension
 chrome-extension-local/*.zip
 chrome-extension/*.zip
+
+# Zip files
+*.zip
