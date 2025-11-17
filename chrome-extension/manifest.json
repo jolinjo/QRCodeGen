@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "QR 碼產生器",
+  "version": "1.1.0",
+  "description": "使用 QRCode Monkey API 產生 QR 碼",
+  "permissions": [
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://api.qrcode-monkey.com/*",
+    "https://qrcode-monkey.p.rapidapi.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "QR 碼產生器",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
