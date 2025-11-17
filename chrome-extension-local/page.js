@@ -74,8 +74,8 @@ const ERROR_LEVEL_MAX_LOGO_SCALE = {
 
 // 獲取當前容錯率對應的最大 logo 比例
 function getMaxLogoScale() {
-  const errorLevel = (els.errorLevel.value || 'L').toUpperCase();
-  return ERROR_LEVEL_MAX_LOGO_SCALE[errorLevel] || 0.07;
+  const errorLevel = (els.errorLevel.value || 'Q').toUpperCase();
+  return ERROR_LEVEL_MAX_LOGO_SCALE[errorLevel] || 0.25;
 }
 
 // 更新 logo 比例輸入框的最大值和當前值
@@ -120,6 +120,9 @@ const els = {
   previewImage: document.getElementById('preview'),
   downloadSvg: document.getElementById('download-svg'),
   downloadDxf: document.getElementById('download-dxf'),
+  previewTableContainer: document.getElementById('preview-table-container'),
+  previewTableBody: document.getElementById('preview-table-body'),
+  currentCharCount: document.getElementById('current-char-count'),
 };
 
 async function checkServer() {
@@ -198,7 +201,7 @@ async function generate() {
     border: 0,
     dark: '#000000',
     light: '#ffffff',
-    errorLevel: (els.errorLevel.value || 'L').toUpperCase(),
+    errorLevel: (els.errorLevel.value || 'Q').toUpperCase(),
   };
   const metadata = extractMetadata();
   const extracted = metadata.filename;
@@ -371,9 +374,128 @@ els.button.addEventListener('click', () => {
   generate();
 });
 
+// Debounce 函數
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// 更新預覽表格
+function updatePreviewTable(previewData) {
+  if (!previewData || !previewData.preview || previewData.preview.length === 0) {
+    els.previewTableContainer.classList.add('hidden');
+    return;
+  }
+
+  // 更新字數顯示
+  const dataLength = previewData.data ? previewData.data.length : 0;
+  els.currentCharCount.textContent = dataLength.toLocaleString();
+
+  els.previewTableBody.innerHTML = '';
+  
+  previewData.preview.forEach((item) => {
+    const row = document.createElement('tr');
+    
+    if (item.error) {
+      row.innerHTML = `
+        <td>${item.error_level}</td>
+        <td colspan="5" class="error-cell">錯誤: ${item.error}</td>
+      `;
+    } else {
+      const errorLevelName = {
+        L: 'L (7%)',
+        M: 'M (15%)',
+        Q: 'Q (25%)',
+        H: 'H (30%)',
+      }[item.error_level] || item.error_level;
+      
+      row.innerHTML = `
+        <td>${errorLevelName}</td>
+        <td>${item.version || '-'}</td>
+        <td>${item.modules_per_side || '-'}×${item.modules_per_side || '-'}</td>
+        <td>${item.module_size_mm ? parseFloat(item.module_size_mm).toFixed(2) : '-'}</td>
+        <td>${item.clear_area_mm ? parseFloat(item.clear_area_mm).toFixed(2) : '-'}</td>
+        <td>${item.max_capacity ? item.max_capacity.toLocaleString() : '-'}</td>
+      `;
+    }
+    
+    els.previewTableBody.appendChild(row);
+  });
+
+  els.previewTableContainer.classList.remove('hidden');
+}
+
+// 調用預覽 API
+async function fetchPreview() {
+  const data = els.data.value.trim();
+  if (!data) {
+    els.previewTableContainer.classList.add('hidden');
+    return;
+  }
+
+  try {
+    const scale = Number(els.scale.value) || 8;
+    const qrWidthMm = parseFloat(els.qrWidth.value) || 16.5;
+    const qrHeightMm = parseFloat(els.qrHeight.value) || 16.5;
+
+    const response = await fetch('http://127.0.0.1:5002/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data,
+        scale,
+        border: 0,
+        qrWidthMm,
+        qrHeightMm,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (response.ok && result.status === 'ok') {
+      updatePreviewTable(result);
+    } else {
+      els.previewTableContainer.classList.add('hidden');
+    }
+  } catch (error) {
+    console.error('預覽失敗:', error);
+    els.previewTableContainer.classList.add('hidden');
+  }
+}
+
+// 使用 debounce 包裝預覽函數，延遲 500ms
+const debouncedFetchPreview = debounce(fetchPreview, 500);
+
+// 監聽輸入內容變化
+els.data.addEventListener('input', () => {
+  debouncedFetchPreview();
+});
+
+// 監聽 QR 寬度和高度變化
+els.qrWidth.addEventListener('input', () => {
+  debouncedFetchPreview();
+});
+
+els.qrHeight.addEventListener('input', () => {
+  debouncedFetchPreview();
+});
+
+// 監聽模組大小變化
+els.scale.addEventListener('input', () => {
+  debouncedFetchPreview();
+});
+
 // 監聽容錯率變化，動態調整 logo 比例的最大值
 els.errorLevel.addEventListener('change', () => {
   updateLogoScaleLimit();
+  debouncedFetchPreview();
 });
 
 // 頁面載入時初始化 logo 比例的最大值

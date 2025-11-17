@@ -8,7 +8,6 @@
 <body>
   <header>
     <h1>🔳 本地 QR Code 產生器</h1>
-    <p>透過 <code>http://127.0.0.1:5001/generate</code> 的 Python 服務產生 QR 碼。</p>
     <div id="server-status" class="status status-off">未連線</div>
   </header>
 
@@ -27,14 +26,14 @@
       <div class="grid">
         <label>容錯率
           <select id="error-level">
-            <option value="L" selected>L (7%)</option>
+            <option value="L">L (7%)</option>
             <option value="M">M (15%)</option>
-            <option value="Q">Q (25%)</option>
+            <option value="Q" selected>Q (25%)</option>
             <option value="H">H (30%)</option>
           </select>
         </label>
         <label>Logo 與 QR 比例
-          <input type="number" id="logo-scale" min="0" max="0.07" step="0.01" value="0.07">
+          <input type="number" id="logo-scale" min="0" max="0.25" step="0.01" value="0.25">
         </label>
         <label>QR 寬度 (mm)
           <input type="number" id="qr-width" min="1" max="500" step="0.1" value="16.5">
@@ -50,6 +49,25 @@
 
       <button id="generate-btn" class="primary">產生 QR Code</button>
       <div id="message" role="alert"></div>
+
+      <div id="preview-table-container" class="preview-table-container hidden">
+        <h3>參數預覽表</h3>
+        <p class="preview-hint">目前輸入內容總字數：<span id="current-char-count">0</span> 字元</p>
+        <table id="preview-table" class="preview-table">
+          <thead>
+            <tr>
+              <th>容錯率</th>
+              <th>版本</th>
+              <th>模組數</th>
+              <th>單點尺寸 (mm)</th>
+              <th>中央留白 (mm)</th>
+              <th>可容納字數</th>
+            </tr>
+          </thead>
+          <tbody id="preview-table-body">
+          </tbody>
+        </table>
+      </div>
     </section>
 
     <section class="panel" id="result-panel">

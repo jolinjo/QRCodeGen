@@ -237,8 +237,77 @@ footer {
   color: #64748b;
 }
 
+.preview-table-container {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.preview-table-container h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  color: #1f2933;
+}
+
+.preview-hint {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+.preview-table thead {
+  background: #f1f5f9;
+}
+
+.preview-table th {
+  padding: 12px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: #334155;
+  border-bottom: 2px solid #e2e8f0;
+  font-size: 13px;
+}
+
+.preview-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #475569;
+}
+
+.preview-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.preview-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.preview-table .error-cell {
+  color: #b91c1c;
+  font-style: italic;
+}
+
 @media (max-width: 960px) {
   main {
     grid-template-columns: 1fr;
+  }
+
+  .preview-table {
+    font-size: 12px;
+  }
+
+  .preview-table th,
+  .preview-table td {
+    padding: 8px 4px;
   }
 }
