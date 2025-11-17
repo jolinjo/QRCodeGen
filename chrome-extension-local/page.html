@@ -19,27 +19,12 @@
       <textarea id="qr-data" rows="3" placeholder="https://example.com"></textarea>
 
       <div class="grid">
-        <label>輸出格式
-          <select id="format">
-            <option value="svg">SVG</option>
-            <option value="dxf">DXF</option>
-          </select>
-        </label>
         <label>模組大小 (scale)
           <input type="number" id="scale" min="1" max="20" value="8">
-        </label>
-        <label>邊框寬度 (border)
-          <input type="number" id="border" min="0" max="10" value="4">
         </label>
       </div>
 
       <div class="grid">
-        <label>深色模組
-          <input type="color" id="dark" value="#000000">
-        </label>
-        <label>淺色背景
-          <input type="color" id="light" value="#ffffff">
-        </label>
         <label>容錯率
           <select id="error-level">
             <option value="L" selected>L (7%)</option>
@@ -64,7 +49,6 @@
       </label>
 
       <button id="generate-btn" class="primary">產生 QR Code</button>
-      <button id="generate-ai-btn" class="secondary">產生 AI (Illustrator 8)</button>
       <div id="message" role="alert"></div>
     </section>
 
@@ -81,7 +65,8 @@
       <div id="preview-container" class="preview hidden">
         <img id="preview" alt="QR 預覽">
       </div>
-      <a id="download-link" class="download-btn" download>下載檔案</a>
+      <a id="download-svg" class="download-btn" download>下載 SVG</a>
+      <a id="download-dxf" class="download-btn" download>下載 DXF</a>
     </section>
   </main>
 

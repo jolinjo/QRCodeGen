@@ -67,18 +67,13 @@ const API_URL = 'http://127.0.0.1:5002/generate';
 const els = {
   status: document.getElementById('server-status'),
   data: document.getElementById('qr-data'),
-  format: document.getElementById('format'),
   scale: document.getElementById('scale'),
-  border: document.getElementById('border'),
-  dark: document.getElementById('dark'),
-  light: document.getElementById('light'),
   errorLevel: document.getElementById('error-level'),
   logo: document.getElementById('logo'),
   logoScale: document.getElementById('logo-scale'),
   qrWidth: document.getElementById('qr-width'),
   qrHeight: document.getElementById('qr-height'),
   button: document.getElementById('generate-btn'),
-  buttonAi: document.getElementById('generate-ai-btn'),
   message: document.getElementById('message'),
   metaInfo: document.getElementById('meta-info'),
   metaVersion: document.getElementById('meta-version'),
@@ -87,7 +82,8 @@ const els = {
   metaClearArea: document.getElementById('meta-clear-area'),
   previewContainer: document.getElementById('preview-container'),
   previewImage: document.getElementById('preview'),
-  download: document.getElementById('download-link'),
+  downloadSvg: document.getElementById('download-svg'),
+  downloadDxf: document.getElementById('download-dxf'),
 };
 
 async function checkServer() {
@@ -121,21 +117,38 @@ function setMessage(text, type = '') {
   els.message.className = type;
 }
 
+let svgBlobUrl = null;
+let dxfBlobUrl = null;
+
 function resetResult() {
   els.previewContainer.classList.add('hidden');
   els.previewImage.src = '';
-  els.download.classList.add('disabled');
-  els.download.removeAttribute('href');
-  els.download.removeAttribute('download');
-  els.download.textContent = '下載檔案';
+  els.downloadSvg.classList.add('disabled');
+  els.downloadDxf.classList.add('disabled');
+  els.downloadSvg.removeAttribute('href');
+  els.downloadDxf.removeAttribute('href');
+  els.downloadSvg.removeAttribute('download');
+  els.downloadDxf.removeAttribute('download');
+  els.downloadSvg.textContent = '下載 SVG';
+  els.downloadDxf.textContent = '下載 DXF';
   els.metaInfo.classList.add('hidden');
   els.metaVersion.textContent = '';
   els.metaModuleSize.textContent = '';
   els.metaQrSize.textContent = '';
   els.metaClearArea.textContent = '';
+  
+  // 清理舊的 blob URL
+  if (svgBlobUrl) {
+    URL.revokeObjectURL(svgBlobUrl);
+    svgBlobUrl = null;
+  }
+  if (dxfBlobUrl) {
+    URL.revokeObjectURL(dxfBlobUrl);
+    dxfBlobUrl = null;
+  }
 }
 
-async function generate(forcedFormat = null) {
+async function generate() {
   resetResult();
   const data = els.data.value.trim();
   if (!data) {
@@ -143,41 +156,35 @@ async function generate(forcedFormat = null) {
     return;
   }
 
-  const format = forcedFormat || els.format.value;
-
-  const payload = {
+  const basePayload = {
     data,
-    format,
     scale: Number(els.scale.value) || 8,
-    border: Number(els.border.value) || 4,
-    dark: els.dark.value || '#000000',
-    light: els.light.value || '#ffffff',
+    border: 0,
+    dark: '#000000',
+    light: '#ffffff',
     errorLevel: (els.errorLevel.value || 'L').toUpperCase(),
   };
   const metadata = extractMetadata();
   const extracted = metadata.filename;
   const cycleNumber = metadata.cycle;
-  if (extracted) {
-    payload.filename = `${extracted}.${format}`;
-  }
 
   const logoRatio = parseFloat(els.logoScale.value);
   if (!Number.isNaN(logoRatio)) {
     const clamped = Math.min(Math.max(logoRatio, 0), 0.4);
-    payload.logoScale = clamped;
+    basePayload.logoScale = clamped;
     if (clamped !== logoRatio) {
       els.logoScale.value = clamped.toFixed(2);
     }
   } else {
-    payload.logoScale = 0.3;
+    basePayload.logoScale = 0.3;
     els.logoScale.value = '0.30';
   }
 
   const widthMm = parseFloat(els.qrWidth.value);
   const heightMm = parseFloat(els.qrHeight.value);
   const DEFAULT_QR_MM = 16.5;
-  payload.qrWidthMm = !Number.isNaN(widthMm) && widthMm > 0 ? widthMm : DEFAULT_QR_MM;
-  payload.qrHeightMm = !Number.isNaN(heightMm) && heightMm > 0 ? heightMm : DEFAULT_QR_MM;
+  basePayload.qrWidthMm = !Number.isNaN(widthMm) && widthMm > 0 ? widthMm : DEFAULT_QR_MM;
+  basePayload.qrHeightMm = !Number.isNaN(heightMm) && heightMm > 0 ? heightMm : DEFAULT_QR_MM;
   if (Number.isNaN(widthMm) || widthMm <= 0) {
     els.qrWidth.value = DEFAULT_QR_MM.toFixed(1);
   }
@@ -194,10 +201,10 @@ async function generate(forcedFormat = null) {
       setMessage('請上傳 SVG 檔案作為 Logo', 'error');
       return;
     }
-    payload.logo = await readFileAsDataURL(file);
+    basePayload.logo = await readFileAsDataURL(file);
   } else if (cycleNumber && cycleNumber >= 1 && cycleNumber <= 5) {
     try {
-      payload.logo = await loadCycleLogo(cycleNumber);
+      basePayload.logo = await loadCycleLogo(cycleNumber);
     } catch (err) {
       console.error(err);
     }
@@ -205,34 +212,51 @@ async function generate(forcedFormat = null) {
 
   try {
     els.button.disabled = true;
-    if (els.buttonAi) {
-      els.buttonAi.disabled = true;
-    }
     setMessage('產生中...', '');
 
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    const result = await response.json();
-
-    if (!response.ok || result.status !== 'ok') {
-      throw new Error(result.message || '無法產生 QR Code');
+    // 同時產生 SVG 和 DXF
+    const svgPayload = { ...basePayload, format: 'svg' };
+    const dxfPayload = { ...basePayload, format: 'dxf' };
+    
+    if (extracted) {
+      svgPayload.filename = `${extracted}.svg`;
+      dxfPayload.filename = `${extracted}.dxf`;
     }
 
-    const label = payload.format.toUpperCase();
-    setMessage(`產生成功！${label} 檔案已準備下載。`, 'success');
+    const [svgResponse, dxfResponse] = await Promise.all([
+      fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(svgPayload),
+      }),
+      fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dxfPayload),
+      }),
+    ]);
 
-    if (result.metadata) {
-      const version = result.metadata.version ?? '?';
-      const modules = result.metadata.modules_per_side ?? '?';
-      const moduleSize = result.metadata.module_size ?? '?';
-      const moduleSizeMm = result.metadata.module_size_mm ?? null;
-      const qrWidthMm = result.metadata.qr_width_mm ?? null;
-      const qrHeightMm = result.metadata.qr_height_mm ?? null;
-      const clearSizeMm = result.metadata.clear_area_mm ?? null;
+    const svgResult = await svgResponse.json();
+    const dxfResult = await dxfResponse.json();
+
+    if (!svgResponse.ok || svgResult.status !== 'ok') {
+      throw new Error(svgResult.message || '無法產生 SVG QR Code');
+    }
+    if (!dxfResponse.ok || dxfResult.status !== 'ok') {
+      throw new Error(dxfResult.message || '無法產生 DXF QR Code');
+    }
+
+    setMessage('產生成功！SVG 和 DXF 檔案已準備下載。', 'success');
+
+    // 顯示元資料（使用 SVG 的元資料）
+    if (svgResult.metadata) {
+      const version = svgResult.metadata.version ?? '?';
+      const modules = svgResult.metadata.modules_per_side ?? '?';
+      const moduleSize = svgResult.metadata.module_size ?? '?';
+      const moduleSizeMm = svgResult.metadata.module_size_mm ?? null;
+      const qrWidthMm = svgResult.metadata.qr_width_mm ?? null;
+      const qrHeightMm = svgResult.metadata.qr_height_mm ?? null;
+      const clearSizeMm = svgResult.metadata.clear_area_mm ?? null;
 
       els.metaVersion.textContent = `版本：${version}（模組：${modules}×${modules}）`;
       els.metaModuleSize.textContent = moduleSizeMm
@@ -248,50 +272,56 @@ async function generate(forcedFormat = null) {
       els.metaInfo.classList.remove('hidden');
     }
 
-    const byteString = atob(result.data);
-    const arrayBuffer = new ArrayBuffer(byteString.length);
-    const uintArray = new Uint8Array(arrayBuffer);
-    for (let i = 0; i < byteString.length; i += 1) {
-      uintArray[i] = byteString.charCodeAt(i);
+    // 處理 SVG
+    const svgByteString = atob(svgResult.data);
+    const svgArrayBuffer = new ArrayBuffer(svgByteString.length);
+    const svgUintArray = new Uint8Array(svgArrayBuffer);
+    for (let i = 0; i < svgByteString.length; i += 1) {
+      svgUintArray[i] = svgByteString.charCodeAt(i);
     }
-    const blob = new Blob([arrayBuffer], { type: result.mime });
-    const url = URL.createObjectURL(blob);
+    const svgBlob = new Blob([svgArrayBuffer], { type: svgResult.mime });
+    svgBlobUrl = URL.createObjectURL(svgBlob);
 
-    els.download.href = url;
-    const downloadBase = result.filename
-      ? result.filename.replace(/\.[^.]+$/, '')
+    const svgDownloadBase = svgResult.filename
+      ? svgResult.filename.replace(/\.[^.]+$/, '')
       : extracted ?? 'qrcode';
-    els.download.download = `${downloadBase}.${payload.format}`;
-    els.download.classList.remove('disabled');
-    els.download.textContent = `下載 ${label}`;
+    els.downloadSvg.href = svgBlobUrl;
+    els.downloadSvg.download = `${svgDownloadBase}.svg`;
+    els.downloadSvg.classList.remove('disabled');
+    els.downloadSvg.textContent = '下載 SVG';
 
-    if (payload.format === 'svg') {
-      els.previewImage.src = url;
-      els.previewContainer.classList.remove('hidden');
-    } else {
-      els.previewContainer.classList.add('hidden');
-      els.previewImage.src = '';
+    // 處理 DXF
+    const dxfByteString = atob(dxfResult.data);
+    const dxfArrayBuffer = new ArrayBuffer(dxfByteString.length);
+    const dxfUintArray = new Uint8Array(dxfArrayBuffer);
+    for (let i = 0; i < dxfByteString.length; i += 1) {
+      dxfUintArray[i] = dxfByteString.charCodeAt(i);
     }
+    const dxfBlob = new Blob([dxfArrayBuffer], { type: dxfResult.mime });
+    dxfBlobUrl = URL.createObjectURL(dxfBlob);
+
+    const dxfDownloadBase = dxfResult.filename
+      ? dxfResult.filename.replace(/\.[^.]+$/, '')
+      : extracted ?? 'qrcode';
+    els.downloadDxf.href = dxfBlobUrl;
+    els.downloadDxf.download = `${dxfDownloadBase}.dxf`;
+    els.downloadDxf.classList.remove('disabled');
+    els.downloadDxf.textContent = '下載 DXF';
+
+    // 使用 SVG 預覽
+    els.previewImage.src = svgBlobUrl;
+    els.previewContainer.classList.remove('hidden');
   } catch (error) {
     console.error(error);
     setMessage(error.message || '產生過程發生錯誤', 'error');
   } finally {
     els.button.disabled = false;
-    if (els.buttonAi) {
-      els.buttonAi.disabled = false;
-    }
   }
 }
 
 els.button.addEventListener('click', () => {
   generate();
 });
-
-if (els.buttonAi) {
-  els.buttonAi.addEventListener('click', () => {
-    generate('ai');
-  });
-}
 
 checkServer();
 setInterval(checkServer, 5000);
