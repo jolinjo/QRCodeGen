@@ -611,14 +611,18 @@ def _add_logo_to_dxf(
                     max_x = max(max_x, x)
                     max_y = max(max_y, y)
         
-        # 遞歸處理子元素
-        new_transform = (sx, 0, 0, sy, tx, ty)
-        for child in elem:
-            find_bounds(child, new_transform)
+        # 遞歸處理子元素（包括 g 元素）
+        if tag == "g" or tag == "svg":
+            # 對於 group 元素，需要遞歸處理子元素
+            new_transform = (sx, 0, 0, sy, tx, ty)
+            for child in elem:
+                find_bounds(child, new_transform)
     
     # 遍歷所有元素找到邊界
+    # 初始化變換矩陣
+    initial_transform = (1, 0, 0, 1, 0, 0)
     for child in root:
-        find_bounds(child)
+        find_bounds(child, initial_transform)
     
     # 如果找到了實際邊界，使用實際內容的中心；否則使用 viewBox 中心
     if min_x != float('inf') and min_y != float('inf'):
