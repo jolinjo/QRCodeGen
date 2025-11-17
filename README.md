@@ -1,85 +1,140 @@
-# QR 碼產生器
+# QR 碼產生器（精簡版）
 
-這是一個使用 [QRCode Monkey API](https://www.qrcode-monkey.com/qr-code-api-with-logo/) 的 QR 碼產生器專案，目前提供三種執行方式：
+一個使用 Python 本地服務產生 QR 碼的 Chrome 擴充功能。不依賴任何雲端 API，所有處理都在本地完成。
 
-1. **Web 版（推薦）**：直接在瀏覽器中開啟 `web/index.html`。
-2. **Chrome 擴充功能（雲端 API）**：`chrome-extension/`，呼叫 QRCode Monkey。
-3. **Chrome 擴充功能（本地 Python）**：`chrome-extension-local/`，需先啟動 Flask 服務後使用。
-4. **離線 CLI 工具**：`offline_generator/`，可在本地端產生 QR 碼且不依賴 API。
-5. **Python GUI 應用程式**：位於 `src/`，可作為桌面程式執行。
+## 功能特色
 
-## 功能特色（Web 版）
-
-- 📱 單頁應用介面，無需安裝擴充功能
-- 🔗 支援網址與文字輸入
-- 🎨 固定美觀樣式（鑽石身體、Frame 12 眼睛、Ball 14 眼球，經典黑白配色）
-- 💾 支援 PNG、SVG、EPS 等輸出格式
-- 👁️ 即時預覽（PNG）
-- ⬇️ 一鍵下載產生的檔案
+- 🐍 **本地 Python 服務**：使用 Flask + segno 在本地產生 QR 碼
+- 🎨 **客製化樣式**：菱形模組、圓形定位點
+- 📐 **尺寸控制**：可設定 QR 碼整體尺寸（mm）、中央留白比例
+- 🖼️ **Logo 支援**：自動載入 SVG Logo（可依 cycle 參數自動選擇）
+- 📊 **多格式輸出**：支援 SVG、DXF、AI（Illustrator 8）格式
+- 📏 **詳細資訊顯示**：版本、模組數、單點尺寸、QR 尺寸、中央留白尺寸
 
 ## 專案結構
 
 ```
-python_project/
-├── web/                 # 建議使用的 Web 版
-│   ├── index.html
-│   ├── style.css
-│   └── app.js
-├── chrome-extension/    # 保留的 Chrome 擴充功能
+QRCodeGen/
+├── chrome-extension-local/    # Chrome 擴充功能 GUI
 │   ├── manifest.json
 │   ├── background.js
 │   ├── page.html
 │   ├── page.css
 │   ├── page.js
-│   ├── icons/
+│   ├── logos/                 # 預設 Logo（1.svg ~ 5.svg）
 │   └── README.md
-├── offline_generator/   # 離線 CLI 工具
-│   ├── generate_qr.py
+├── offline_generator/         # Python 本地服務
+│   ├── server_flask.py        # Flask API 伺服器
 │   └── README.md
-├── src/                 # Python GUI 應用程式
-│   ├── main.py
-│   ├── qr_api.py
-│   └── qr_gui.py
-├── tests/
-├── requirements.txt
+├── requirements.txt           # Python 依賴套件
 └── README.md
 ```
 
-## Web 版（推薦）
+## 安裝與使用
 
-1. 開啟 `web/index.html`（直接用瀏覽器開啟即可）
-2. 輸入欲轉換的網址或文字
-3. 選擇輸出大小（100-1000），可選擇是否上傳 Logo（PNG / JPG / SVG）
-4. 點擊「產生 QR 碼」
-5. 產生後可下載 PNG / SVG / EPS 檔案
-
-> 若需部署，可將 `web/` 目錄整體放置於靜態網站伺服器或 CDN。
-
-## Chrome 擴充功能（選用）
-
-若仍需使用擴充功能版本，可參考 `chrome-extension/README.md` 內的安裝與使用說明。該版本同樣使用固定樣式。
-
-## Python GUI 應用程式
-
-### 安裝
-
-1. 確保已安裝 Python 3.8 或更高版本
-2. 安裝依賴套件：
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-### 執行
+### 1. 安裝 Python 依賴
 
 ```bash
-python src/main.py
+python3 -m pip install -r requirements.txt
 ```
 
-> 注意：Python GUI 版在 macOS 26+ 可能有相容性問題，建議優先使用 Web 版。
+或使用虛擬環境（建議）：
 
-## API 說明
+```bash
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-本專案使用 QRCode Monkey 官方 API。若需更進階的造型客製化或自訂 API Key（如經由 RapidAPI），請參考官方文件並調整 `app.js` 或 `popup.js` 中的請求設定。
+### 2. 啟動 Flask 服務
+
+```bash
+source .venv/bin/activate  # 如果使用虛擬環境
+python offline_generator/server_flask.py --port 5002
+```
+
+服務會在本機 `http://127.0.0.1:5002` 運行。
+
+### 3. 安裝 Chrome 擴充功能
+
+1. 開啟 Chrome，前往 `chrome://extensions/`
+2. 開啟「開發人員模式」（右上角開關）
+3. 點擊「載入未封裝項目」
+4. 選擇 `chrome-extension-local/` 目錄
+5. 擴充功能圖示會出現在工具列
+
+### 4. 使用擴充功能
+
+1. 點擊擴充功能圖示，會開啟新的分頁
+2. 輸入要編碼的文字或網址
+3. 選擇輸出格式（SVG / DXF / AI）
+4. 調整設定：
+   - 容錯率（L/M/Q/H，預設 L）
+   - QR 寬度/高度（mm）
+   - Logo 與 QR 比例（0 ~ 0.4）
+   - 上傳 Logo（SVG）或依 cycle 參數自動載入
+5. 點擊「產生 QR Code」或「產生 AI」
+6. 預覽並下載
+
+## 自動功能
+
+### 自動檔名
+
+如果輸入的網址包含以下參數，會自動組合成檔名：
+- `material=...`：材料
+- `lot=...`：原料批號
+- `date=...`：日期
+- `cycle=...`：循環次數
+
+檔名格式：`材料-原料批號-日期-循環次數.格式`
+
+### 自動 Logo
+
+如果網址中有 `cycle=1~5` 且未上傳 Logo，會自動載入 `logos/{cycle}.svg`。
+
+## API 端點
+
+### POST /generate
+
+產生 QR 碼。
+
+**請求範例：**
+
+```json
+{
+  "data": "https://example.com",
+  "format": "svg",
+  "scale": 8,
+  "border": 4,
+  "dark": "#000000",
+  "light": "#ffffff",
+  "errorLevel": "L",
+  "qrWidthMm": 16.5,
+  "qrHeightMm": 16.5,
+  "logoScale": 0.3,
+  "logo": "data:image/svg+xml;base64,..."
+}
+```
+
+**回應範例：**
+
+```json
+{
+  "status": "ok",
+  "filename": "qrcode.svg",
+  "mime": "image/svg+xml",
+  "data": "base64_encoded_content...",
+  "metadata": {
+    "version": 4,
+    "modules_per_side": 33,
+    "module_size": 8,
+    "module_size_mm": 0.5,
+    "qr_width_mm": 16.5,
+    "qr_height_mm": 16.5,
+    "clear_area_mm": 4.95
+  }
+}
+```
 
 ## 授權
 
