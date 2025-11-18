@@ -1151,6 +1151,7 @@ def preview() -> Response:
     border = int(payload.get("border", 0))
     qr_width_mm = _safe_float(payload.get("qrWidthMm"), DEFAULT_QR_MM)
     qr_height_mm = _safe_float(payload.get("qrHeightMm"), qr_width_mm)
+    logo_scale = _safe_float(payload.get("logoScale"), 0.0)
 
     # 不同容錯率的最大 logo 比例
     error_level_max_ratio = {
@@ -1158,6 +1159,14 @@ def preview() -> Response:
         "M": 0.15,
         "Q": 0.25,
         "H": 0.30,
+    }
+    
+    # 不同容錯率的百分比
+    error_level_percentage = {
+        "L": 0.07,  # 7%
+        "M": 0.15,  # 15%
+        "Q": 0.25,  # 25%
+        "H": 0.30,  # 30%
     }
 
     results = []
@@ -1225,6 +1234,19 @@ def preview() -> Response:
                     error_index = {"L": 0, "M": 1, "Q": 2, "H": 3}.get(error_level, 0)
                     max_capacity = capacities[error_index]
 
+            # 計算剩餘容錯區域
+            # 剩餘容錯區域 = 容錯率百分比 - logo 比例百分比
+            error_percentage = error_level_percentage.get(error_level, 0.0)
+            # 確保 logo_scale 在合理範圍內（0 到 max_ratio）
+            actual_logo_scale = max(0.0, min(logo_scale, max_ratio))
+            remaining_error_margin = max(0.0, error_percentage - actual_logo_scale)
+            
+            # 計算冗餘資料量（以字元數計）
+            # 冗餘資料量 = 總容量 × 容錯率百分比
+            redundant_data = None
+            if max_capacity is not None:
+                redundant_data = int(max_capacity * error_percentage)
+            
             results.append({
                 "error_level": error_level,
                 "version": version,
@@ -1233,6 +1255,8 @@ def preview() -> Response:
                 "clear_area_mm": clear_size_mm,
                 "max_logo_ratio": max_ratio,
                 "max_capacity": max_capacity,
+                "remaining_error_margin": remaining_error_margin,  # 剩餘容錯區域（比例）
+                "redundant_data": redundant_data,  # 冗餘資料量（字元數）
             })
         except Exception as exc:  # noqa: BLE001
             results.append({

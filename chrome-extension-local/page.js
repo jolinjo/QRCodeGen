@@ -406,7 +406,7 @@ function updatePreviewTable(previewData) {
     if (item.error) {
       row.innerHTML = `
         <td>${item.error_level}</td>
-        <td colspan="5" class="error-cell">錯誤: ${item.error}</td>
+        <td colspan="7" class="error-cell">錯誤: ${item.error}</td>
       `;
     } else {
       const errorLevelName = {
@@ -416,6 +416,20 @@ function updatePreviewTable(previewData) {
         H: 'H (30%)',
       }[item.error_level] || item.error_level;
       
+      // 計算並顯示剩餘容錯區域
+      let remainingErrorCell = '-';
+      if (item.remaining_error_margin !== undefined) {
+        const remainingPercent = (item.remaining_error_margin * 100).toFixed(1);
+        // 如果剩餘容錯區域太小，用警告樣式顯示
+        const cellClass = item.remaining_error_margin < 0.05 ? 'warning-cell' : '';
+        remainingErrorCell = `<span class="${cellClass}">${remainingPercent}%</span>`;
+      }
+      
+      // 顯示冗餘資料量
+      const redundantDataCell = item.redundant_data !== undefined && item.redundant_data !== null
+        ? item.redundant_data.toLocaleString()
+        : '-';
+      
       row.innerHTML = `
         <td>${errorLevelName}</td>
         <td>${item.version || '-'}</td>
@@ -423,6 +437,8 @@ function updatePreviewTable(previewData) {
         <td>${item.module_size_mm ? parseFloat(item.module_size_mm).toFixed(2) : '-'}</td>
         <td>${item.clear_area_mm ? parseFloat(item.clear_area_mm).toFixed(2) : '-'}</td>
         <td>${item.max_capacity ? item.max_capacity.toLocaleString() : '-'}</td>
+        <td>${remainingErrorCell}</td>
+        <td>${redundantDataCell}</td>
       `;
     }
     
@@ -445,6 +461,9 @@ async function fetchPreview() {
     const qrWidthMm = parseFloat(els.qrWidth.value) || 16.5;
     const qrHeightMm = parseFloat(els.qrHeight.value) || 16.5;
 
+    // 獲取當前的 logo 比例
+    const logoScale = parseFloat(els.logoScale.value) || 0;
+    
     const response = await fetch('http://127.0.0.1:5002/preview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -454,6 +473,7 @@ async function fetchPreview() {
         border: 0,
         qrWidthMm,
         qrHeightMm,
+        logoScale,
       }),
     });
 
@@ -489,6 +509,11 @@ els.qrHeight.addEventListener('input', () => {
 
 // 監聽模組大小變化
 els.scale.addEventListener('input', () => {
+  debouncedFetchPreview();
+});
+
+// 監聽 logo 比例變化
+els.logoScale.addEventListener('input', () => {
   debouncedFetchPreview();
 });
 

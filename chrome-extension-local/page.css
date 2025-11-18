@@ -297,6 +297,11 @@ footer {
   font-style: italic;
 }
 
+.preview-table .warning-cell {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
 @media (max-width: 960px) {
   main {
     grid-template-columns: 1fr;
