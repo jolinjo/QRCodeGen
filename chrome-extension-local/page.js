@@ -119,7 +119,6 @@ const els = {
   previewContainer: document.getElementById('preview-container'),
   previewImage: document.getElementById('preview'),
   downloadSvg: document.getElementById('download-svg'),
-  downloadDxf: document.getElementById('download-dxf'),
   previewTableContainer: document.getElementById('preview-table-container'),
   previewTableBody: document.getElementById('preview-table-body'),
   currentCharCount: document.getElementById('current-char-count'),
@@ -157,19 +156,14 @@ function setMessage(text, type = '') {
 }
 
 let svgBlobUrl = null;
-let dxfBlobUrl = null;
 
 function resetResult() {
   els.previewContainer.classList.add('hidden');
   els.previewImage.src = '';
   els.downloadSvg.classList.add('disabled');
-  els.downloadDxf.classList.add('disabled');
   els.downloadSvg.removeAttribute('href');
-  els.downloadDxf.removeAttribute('href');
   els.downloadSvg.removeAttribute('download');
-  els.downloadDxf.removeAttribute('download');
   els.downloadSvg.textContent = '下載 SVG';
-  els.downloadDxf.textContent = '下載 DXF';
   els.metaInfo.classList.add('hidden');
   els.metaVersion.textContent = '';
   els.metaModuleSize.textContent = '';
@@ -180,10 +174,6 @@ function resetResult() {
   if (svgBlobUrl) {
     URL.revokeObjectURL(svgBlobUrl);
     svgBlobUrl = null;
-  }
-  if (dxfBlobUrl) {
-    URL.revokeObjectURL(dxfBlobUrl);
-    dxfBlobUrl = null;
   }
 }
 
@@ -265,39 +255,26 @@ async function generate() {
     els.button.disabled = true;
     setMessage('產生中...', '');
 
-    // 同時產生 SVG 和 DXF
+    // 產生 SVG
     const svgPayload = { ...basePayload, format: 'svg' };
-    const dxfPayload = { ...basePayload, format: 'dxf' };
     
     if (extracted) {
       svgPayload.filename = `${extracted}.svg`;
-      dxfPayload.filename = `${extracted}.dxf`;
     }
 
-    const [svgResponse, dxfResponse] = await Promise.all([
-      fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(svgPayload),
-      }),
-      fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dxfPayload),
-      }),
-    ]);
+    const svgResponse = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(svgPayload),
+    });
 
     const svgResult = await svgResponse.json();
-    const dxfResult = await dxfResponse.json();
 
     if (!svgResponse.ok || svgResult.status !== 'ok') {
       throw new Error(svgResult.message || '無法產生 SVG QR Code');
     }
-    if (!dxfResponse.ok || dxfResult.status !== 'ok') {
-      throw new Error(dxfResult.message || '無法產生 DXF QR Code');
-    }
 
-    setMessage('產生成功！SVG 和 DXF 檔案已準備下載。', 'success');
+    setMessage('產生成功！SVG 檔案已準備下載。', 'success');
 
     // 顯示元資料（使用 SVG 的元資料）
     if (svgResult.metadata) {
@@ -340,24 +317,6 @@ async function generate() {
     els.downloadSvg.download = `${svgDownloadBase}.svg`;
     els.downloadSvg.classList.remove('disabled');
     els.downloadSvg.textContent = '下載 SVG';
-
-    // 處理 DXF
-    const dxfByteString = atob(dxfResult.data);
-    const dxfArrayBuffer = new ArrayBuffer(dxfByteString.length);
-    const dxfUintArray = new Uint8Array(dxfArrayBuffer);
-    for (let i = 0; i < dxfByteString.length; i += 1) {
-      dxfUintArray[i] = dxfByteString.charCodeAt(i);
-    }
-    const dxfBlob = new Blob([dxfArrayBuffer], { type: dxfResult.mime });
-    dxfBlobUrl = URL.createObjectURL(dxfBlob);
-
-    const dxfDownloadBase = dxfResult.filename
-      ? dxfResult.filename.replace(/\.[^.]+$/, '')
-      : extracted ?? 'qrcode';
-    els.downloadDxf.href = dxfBlobUrl;
-    els.downloadDxf.download = `${dxfDownloadBase}.dxf`;
-    els.downloadDxf.classList.remove('disabled');
-    els.downloadDxf.textContent = '下載 DXF';
 
     // 使用 SVG 預覽
     els.previewImage.src = svgBlobUrl;
