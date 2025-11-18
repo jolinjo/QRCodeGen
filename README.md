@@ -2,6 +2,8 @@
 
 一個使用 Python 本地服務產生 QR 碼的 Chrome 擴充功能。不依賴任何雲端 API，所有處理都在本地完成。
 
+**當前版本：** v1.0.0
+
 ## 功能特色
 
 - 🐍 **本地 Python 服務**：使用 Flask + segno 在本地產生 QR 碼
@@ -135,6 +137,34 @@ python offline_generator/server_flask.py --port 5002
   }
 }
 ```
+
+## 版本管理
+
+專案使用語義化版本號（Semantic Versioning）：`MAJOR.MINOR.PATCH`
+
+### 自動累進版本號
+
+每次提交後，使用以下命令自動累進版本號：
+
+```bash
+# 累進補丁版本號（預設，例如 1.0.0 -> 1.0.1）
+python3 bump_version.py patch
+
+# 累進次版本號（例如 1.0.0 -> 1.1.0）
+python3 bump_version.py minor
+
+# 累進主版本號（例如 1.0.0 -> 2.0.0）
+python3 bump_version.py major
+```
+
+版本號會自動更新 `VERSION` 檔案，並且在下次提交時使用新的版本號。
+
+### 提交流程
+
+1. 進行程式碼修改
+2. 提交時在 commit message 中包含版本號：`v1.0.0: 描述變更內容`
+3. 提交後執行 `python3 bump_version.py patch` 自動累進版本號
+4. 提交版本號更新（為下次提交做準備）
 
 ## 授權
 
